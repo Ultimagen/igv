@@ -60,7 +60,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./build/distributions/IGV_MacApp_UG.zip
+          asset_path: ./build/distributions/IGV_MacApp_user.zip
           asset_name: IGV_MacApp_UG.zip
           asset_content_type: application/zip
       - name: Upload Mac With Java Release Asset
@@ -70,7 +70,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./build/distributions/IGV_MacApp_UG_WithJava.zip
+          asset_path: ./build/distributions/IGV_MacApp_user_WithJava.zip
           asset_name: IGV_MacApp_UG_WithJava.zip
           asset_content_type: application/zip
       - name: Upload MacM1 With Java Release Asset
@@ -80,7 +80,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./build/distributions/IGV_MacM1App_UG_WithJava.zip
+          asset_path: ./build/distributions/IGV_MacM1App_user_WithJava.zip
           asset_name: IGV_MacM1App_UG_WithJava.zip
           asset_content_type: application/zip
       - name: Upload Linux Release Asset
@@ -90,8 +90,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./build/distributions/IGV_Linux_UG.zip
-          asset_name: IGV_Linux_UG.zip
+          asset_path: ./build/distributions/IGV_Linux_user.zip
+          asset_name: IGV_Linux_user.zip
           asset_content_type: application/zip
       - name: Upload Linux With Java Release Asset
         id: upload-linux-with-java-release-asset
@@ -100,7 +100,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./build/distributions/IGV_Linux_UG_WithJava.zip
+          asset_path: ./build/distributions/IGV_Linux_user_WithJava.zip
           asset_name: IGV_Linux_UG_WithJava.zip
           asset_content_type: application/zip
       - name: Upload Win Release Asset
@@ -110,8 +110,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./build/distributions/IGV_Win_UG.zip
-          asset_name: IGV_Win_UG.zip
+          asset_path: ./build/distributions/IGV_Win_user.zip
+          asset_name: IGV_Win_user.zip
           asset_content_type: application/zip
       - name: Upload Win With Java Release Asset
         id: upload-win-with-java-release-asset
@@ -120,7 +120,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./build/distributions/IGV_Win_UG_WithJava.zip
+          asset_path: ./build/distributions/IGV_Win_user_WithJava.zip
           asset_name: IGV_Win_UG_WithJava.zip
           asset_content_type: application/zip
 
