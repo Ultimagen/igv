@@ -136,6 +136,17 @@ class AlignmentTrackMenu extends IGVPopupMenu {
         }));
         add(smallIndelsItem);
 
+        // TEMP: alt flow deletion rendering
+        {
+            JMenuItem altItem = new JCheckBoxMenuItem("Alt Flow Del Render");
+            altItem.setSelected(renderOptions.isAltFlowDeleteQualRendering());
+            altItem.addActionListener(aEvt -> UIUtilities.invokeOnEventThread(() -> {
+                renderOptions.setAltFlowDeleteQualRendering(altItem.isSelected());
+                alignmentTrack.repaint();
+            }));
+            add(altItem);
+        }
+
         // Paired end items
         if (dataManager.isPairedEnd()) {
             addSeparator();

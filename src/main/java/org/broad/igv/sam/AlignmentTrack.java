@@ -1228,6 +1228,11 @@ public class AlignmentTrack extends AbstractTrack implements IGVEventObserver {
 
         private Integer minJunctionCoverage;
 
+        // TEMP
+        private boolean altFlowDeleteQualRendering;
+        public boolean isAltFlowDeleteQualRendering() { return altFlowDeleteQualRendering; }
+        public void setAltFlowDeleteQualRendering(boolean v) { altFlowDeleteQualRendering = v; }
+
 
         BisulfiteContext bisulfiteContext = BisulfiteContext.CG;
         Map<String, PEStats> peStats;

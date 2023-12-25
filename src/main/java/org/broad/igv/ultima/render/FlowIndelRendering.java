@@ -144,7 +144,7 @@ public class FlowIndelRendering {
                     if ( !snp0 ) {
                         quals01[0] = abPrev.getQualities().getByte(abPrev.getQualities().length - 1);
                         double  p;
-                        if ( uff == UltimaFileFormat.BASE_TP ) {
+                        if ( !renderOptions.isAltFlowDeleteQualRendering() && uff == UltimaFileFormat.BASE_TP ) {
                             int         delLength = 1;
                             while ( (delLength + 1) < gap.getnBases() &&
                                     (gapBase0 == Character.toUpperCase(genome.getReference(alignment.getChr(), gap.getStart() + delLength))) )
@@ -152,7 +152,10 @@ public class FlowIndelRendering {
 
                             p = qualsAsProbDeleteTP(((SAMAlignment) alignment), abPrev, delLength, false, gap);
                         } else {
-                            p = qualsAsProb(new ByteSubarray(quals01, 0, quals01.length, (byte)0));
+                            if ( renderOptions.isAltFlowDeleteQualRendering() && gapBase0p != gapBase0 )
+                                p = 0.0;
+                            else
+                                p = qualsAsProb(new ByteSubarray(quals01, 0, quals01.length, (byte)0));
                         }
                         if ( p != 0 ) {
                             markerQ[0] = -10 * Math.log10(p);
@@ -162,7 +165,7 @@ public class FlowIndelRendering {
                     if ( !snp1 ) {
                         quals01[0] = abNext.getQualities().getByte(0);
                         double  p;
-                        if ( uff == UltimaFileFormat.BASE_TP ) {
+                        if ( !renderOptions.isAltFlowDeleteQualRendering() && uff == UltimaFileFormat.BASE_TP ) {
                             int         delLength = 1;
                             while ( (delLength + 1) < gap.getnBases() &&
                                     (gapBase1 == Character.toUpperCase(genome.getReference(alignment.getChr(), gap.getStart() + gap.getnBases() - delLength))) )
@@ -170,7 +173,10 @@ public class FlowIndelRendering {
 
                             p = qualsAsProbDeleteTP((SAMAlignment) alignment, abNext, delLength, true, gap);
                         } else {
-                            p = qualsAsProb(new ByteSubarray(quals01, 0, quals01.length, (byte)0));
+                            if ( renderOptions.isAltFlowDeleteQualRendering() && gapBase1n != gapBase1 )
+                                p = 0.0;
+                            else
+                                p = qualsAsProb(new ByteSubarray(quals01, 0, quals01.length, (byte)0));
                         }
                         if ( p != 0 ) {
                             markerQ[1] = -10 * Math.log10(p);
