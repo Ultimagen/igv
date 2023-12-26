@@ -8,10 +8,12 @@ import org.broad.igv.sam.*;
 import org.broad.igv.track.RenderContext;
 
 import java.awt.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class FlowIndelRendering {
 
     public static final String TAG_T0 = "t0";
+    private static final double NO_INFO_HIGH_QUALITY = 40;
     private static ColorMap indelColorMap = ColorMap.getJet(42);
     private static final double MIN_PROB_DEFAULT = 0.01;
 
@@ -110,6 +112,7 @@ public class FlowIndelRendering {
         // collect quals (experimental)
         Color[]       markerColor = new Color[2];
         double[]      markerQ = new double[2];
+        boolean[]     markerFromT0 = new boolean[2];
         UltimaFileFormat uff = getUltimaFileVersion(alignment);
         if ( renderOptions.isInsertQualColoring() && (uff != UltimaFileFormat.NON_FLOW) ) {
 
@@ -144,46 +147,64 @@ public class FlowIndelRendering {
                     if ( !snp0 ) {
                         quals01[0] = abPrev.getQualities().getByte(abPrev.getQualities().length - 1);
                         double  p;
-                        if ( !renderOptions.isAltFlowDeleteQualRendering() && uff == UltimaFileFormat.BASE_TP ) {
+                        AtomicBoolean fromT0 = new AtomicBoolean();
+                        if ( uff == UltimaFileFormat.BASE_TP ) {
                             int         delLength = 1;
                             while ( (delLength + 1) <= gap.getnBases() &&
                                     (gapBase0 == Character.toUpperCase(genome.getReference(alignment.getChr(), gap.getStart() + delLength))) )
                                 delLength++;
 
-                            p = qualsAsProbDeleteTP(((SAMAlignment) alignment), abPrev, delLength, false, gap);
+                            p = qualsAsProbDeleteTP(((SAMAlignment) alignment), abPrev, delLength, false, gap, gapBase0p == gapBase0, fromT0);
                         } else {
-                            if ( renderOptions.isAltFlowDeleteQualRendering() && gapBase0p != gapBase0 )
-                                p = 0.0;
-                            else
-                                p = qualsAsProb(new ByteSubarray(quals01, 0, quals01.length, (byte)0));
+                            p = qualsAsProb(new ByteSubarray(quals01, 0, quals01.length, (byte)0));
                         }
                         if ( p != 0 ) {
                             markerQ[0] = -10 * Math.log10(p);
                             markerColor[0] = new Color(indelColorMap.getColor((int) markerQ[0]));
+                            markerFromT0[0] = fromT0.get();
                         }
                     }
                     if ( !snp1 ) {
                         quals01[0] = abNext.getQualities().getByte(0);
                         double  p;
-                        if ( !renderOptions.isAltFlowDeleteQualRendering() && uff == UltimaFileFormat.BASE_TP ) {
+                        AtomicBoolean fromT0 = new AtomicBoolean();
+                        if ( uff == UltimaFileFormat.BASE_TP ) {
                             int         delLength = 1;
                             while ( (delLength + 1) <= gap.getnBases() &&
                                     (gapBase1 == Character.toUpperCase(genome.getReference(alignment.getChr(), gap.getStart() + gap.getnBases() - delLength))) )
                                 delLength++;
 
-                            p = qualsAsProbDeleteTP((SAMAlignment) alignment, abNext, delLength, true, gap);
+                            p = qualsAsProbDeleteTP((SAMAlignment) alignment, abNext, delLength, true, gap, gapBase1n == gapBase1, fromT0);
                         } else {
-                            if ( renderOptions.isAltFlowDeleteQualRendering() && gapBase1n != gapBase1 )
-                                p = 0.0;
-                            else
-                                p = qualsAsProb(new ByteSubarray(quals01, 0, quals01.length, (byte)0));
+                            p = qualsAsProb(new ByteSubarray(quals01, 0, quals01.length, (byte)0));
                         }
                         if ( p != 0 ) {
                             markerQ[1] = -10 * Math.log10(p);
                             markerColor[1] = new Color(indelColorMap.getColor((int) markerQ[1]));
+                            markerFromT0[1] = fromT0.get();
                         }
                     }
                 }
+            }
+
+            // perform T0 priority
+            if ( markerFromT0[0] || markerFromT0[1] ) {
+
+                // if both, retain higher quality in slot 0 and erase slot 1.
+                // if just 1 then move to 0
+                if ( markerFromT0[1] ) {
+                    if ( !markerFromT0[0] || (markerQ[1] > markerQ[0]) ) {
+                        markerQ[0] = markerQ[1];    // copy slot 1 into slot 0
+                        markerColor[0] = markerColor[1];
+                    }
+                    markerColor[1] = null; // mark slot 1 as not used
+                }
+            }
+
+            // if no info then assume it is of high quality
+            if ( markerColor[0] == null && markerColor[1] == null ) {
+                markerQ[0] = NO_INFO_HIGH_QUALITY;
+                markerColor[0] = new Color(indelColorMap.getColor((int) markerQ[0]));
             }
 
             // draw delete markers
@@ -193,7 +214,7 @@ public class FlowIndelRendering {
                 int hairline = Math.min(2, (int) (1 / context.getScale()));
 
                 Color c = g.getColor();
-                if ((markerQ[0] == markerQ[1]) || (gap.getnBases() == 1)) {
+                if ((markerQ[0] == markerQ[1]) || (gap.getnBases() == 1) || (markerColor[0] == null ^ markerColor[1] == null)) {
 
                     // draw a full line, average as needed
                     double q1 = markerQ[0];
@@ -424,7 +445,7 @@ public class FlowIndelRendering {
         return true;
     }
 
-    public double qualsAsProbDeleteTP(SAMAlignment samAlignment, AlignmentBlock block, int delLength, boolean delIsBeforeBlock, Gap gap)
+    public double qualsAsProbDeleteTP(SAMAlignment samAlignment, AlignmentBlock block, int delLength, boolean delIsBeforeBlock, Gap gap, boolean belongsToHmer, AtomicBoolean fromT0)
     {
         // access read/record
         SAMRecord   record = samAlignment.getRecord();
@@ -441,10 +462,11 @@ public class FlowIndelRendering {
         // try establising by using t0
         final double t0qual = qualsAsProbDeleteTPByT0(samAlignment, record, block, delLength, delIsBeforeBlock, gap);
         if ( t0qual != 0 ) {
+            fromT0.set(true);
             return t0qual;
         }
 
-        return findQualByTPValue(record, hmer, delLength);
+        return belongsToHmer ? findQualByTPValue(record, hmer, delLength) : 0;
     }
 
     private double qualsAsProbDeleteTPByT0(SAMAlignment samAlignment, SAMRecord record, AlignmentBlock block, int delLength, boolean delIsBeforeBlock, Gap gap) {
