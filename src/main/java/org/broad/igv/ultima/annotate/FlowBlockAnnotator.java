@@ -9,6 +9,7 @@ import org.broad.igv.sam.SAMAlignment;
 public class FlowBlockAnnotator {
 
     private static final String KEY_ATTR = "ti,tp";
+    private static final String T0_ATTR = "t0";
 
     public boolean handlesBlocks(final AlignmentBlock block) {
 
@@ -23,7 +24,7 @@ public class FlowBlockAnnotator {
     public void appendBlockQualityAnnotation(SAMAlignment samAlignment, AlignmentBlock block, StringBuffer buf) {
 
         if ( isFlow(samAlignment.getRecord()) ) {
-            buf.append(" @ QV " + qualsAsString(block.getQualities()) + attrAsString(samAlignment, block, "ti,tp", -1));
+            buf.append(" @ QV " + qualsAsString(block.getQualities()) + attrAsString(samAlignment, block, KEY_ATTR, -1));
         }
     }
 
@@ -31,6 +32,7 @@ public class FlowBlockAnnotator {
 
         if ( isFlow(samAlignment.getRecord()) ) {
             buf.append(attrAsString(samAlignment, block, KEY_ATTR, offset));
+            buf.append(attrAsString(samAlignment, block, T0_ATTR, offset));
         }
     }
 
@@ -59,7 +61,16 @@ public class FlowBlockAnnotator {
         }
         if ( value == null )
             return new int[0];
-        byte[]  arr = (byte[])value;
+        byte[]  arr;
+        if ( value instanceof String ) {
+            arr = ((String)value).getBytes();
+            for ( int i = 0 ; i < arr.length ; i++ ) {
+                arr[i] -= 33;
+            }
+
+        } else {
+            arr = (byte[])value;
+        }
 
         if ( offset >= 0 ) {
             int[]   integers = new int[1];
