@@ -357,7 +357,7 @@ public class FlowIndelRendering {
         HMer        hmer = findHmer(record, start, fragLength, base);
 
         // find tp value and return it
-        return findQualByTPValue(record, hmer, fragLength);
+        return findQualByTPValue(record, hmer, -fragLength);
     }
 
     private HMer findHmer(SAMRecord record, int start, int length, byte base) {
@@ -444,7 +444,7 @@ public class FlowIndelRendering {
             return t0qual;
         }
 
-        return findQualByTPValue(record, hmer, -delLength);
+        return findQualByTPValue(record, hmer, delLength);
     }
 
     private double qualsAsProbDeleteTPByT0(SAMAlignment samAlignment, SAMRecord record, AlignmentBlock block, int delLength, boolean delIsBeforeBlock, Gap gap) {
