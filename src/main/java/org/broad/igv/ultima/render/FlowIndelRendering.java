@@ -53,13 +53,7 @@ public class FlowIndelRendering {
 
         UltimaFileFormat    uff = getUltimaFileVersion(alignment);
         if ( renderOptions.isInsertQualColoring() && (uff != UltimaFileFormat.NON_FLOW) ) {
-            // Ultima: single (==1) INSERT case
-            // map qual into a sort of a linear scale and add indicator
-            double p = (uff == UltimaFileFormat.BASE_TP)
-                    ? qualsAsProbInsertTP((SAMAlignment) alignment, aBlock)
-                    : 0;
-            if ( p == 0 )
-                p = qualsAsProb(aBlock.getQualities());
+            double p = qualsAsProb(aBlock.getQualities());
             if ( p != 0 ) {
                 double q = -10 * Math.log10(p);
                 Color qColor = new Color(indelColorMap.getColor((int) q));
@@ -92,11 +86,7 @@ public class FlowIndelRendering {
         if ( renderOptions.isInsertQualColoring() & (uff != UltimaFileFormat.NON_FLOW) ) {
             // Ultima: large (>1) INSERT case
             // map qual into a sort of a linear scale and add indicator
-            double p = (uff == UltimaFileFormat.BASE_TP)
-                    ? qualsAsProbInsertTP((SAMAlignment)alignment, insertionBlock)
-                    : 0;
-            if ( p == 0 )
-                p = qualsAsProb(insertionBlock.getQualities());
+            double p = qualsAsProb(insertionBlock.getQualities());
             if ( p != 0 ) {
                 double q = -10 * Math.log10(p);
                 Color qColor = new Color(indelColorMap.getColor((int) q));
