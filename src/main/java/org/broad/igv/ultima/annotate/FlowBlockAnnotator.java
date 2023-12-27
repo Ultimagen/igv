@@ -25,6 +25,7 @@ public class FlowBlockAnnotator {
 
         if ( isFlow(samAlignment.getRecord()) ) {
             buf.append(" @ QV " + qualsAsString(block.getQualities()) + attrAsString(samAlignment, block, KEY_ATTR, -1));
+            buf.append(" " + attrAsString(samAlignment, block, T0_ATTR, -1));
         }
     }
 

@@ -57,7 +57,9 @@ public class FlowIndelRendering {
             // map qual into a sort of a linear scale and add indicator
             double p = (uff == UltimaFileFormat.BASE_TP)
                     ? qualsAsProbInsertTP((SAMAlignment) alignment, aBlock)
-                    : qualsAsProb(aBlock.getQualities());
+                    : 0;
+            if ( p == 0 )
+                p = qualsAsProb(aBlock.getQualities());
             if ( p != 0 ) {
                 double q = -10 * Math.log10(p);
                 Color qColor = new Color(indelColorMap.getColor((int) q));
@@ -92,7 +94,9 @@ public class FlowIndelRendering {
             // map qual into a sort of a linear scale and add indicator
             double p = (uff == UltimaFileFormat.BASE_TP)
                     ? qualsAsProbInsertTP((SAMAlignment)alignment, insertionBlock)
-                    : qualsAsProb(insertionBlock.getQualities());
+                    : 0;
+            if ( p == 0 )
+                p = qualsAsProb(insertionBlock.getQualities());
             if ( p != 0 ) {
                 double q = -10 * Math.log10(p);
                 Color qColor = new Color(indelColorMap.getColor((int) q));
