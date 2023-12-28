@@ -57,8 +57,10 @@ public class FlowIndelRendering {
             if ( p != 0 ) {
                 double q = -10 * Math.log10(p);
                 Color qColor = new Color(indelColorMap.getColor((int) q));
+                Color c = g.getColor();
                 g.setColor(qColor);
                 g.fillRect(x - pxWing, (int) (y + (h - hairline) * (q / 42)) - 1, hairline + 2 * pxWing, hairline * 2);
+                g.setColor(c);
             }
         }
     }
@@ -80,8 +82,11 @@ public class FlowIndelRendering {
             hairline = Math.min(hairline, pxWing);
         }
 
+        Color c = g.getColor();
+        g.setColor(AlignmentRenderer.purple);
         g.fillRect(pxLeft - pxWing, pxTop, pxRight - pxLeft + hairline * pxWing, hairline);
         g.fillRect(pxLeft - pxWing, pxTop + pxH - hairline, pxRight - pxLeft + hairline * pxWing, hairline);
+        g.setColor(c);
         UltimaFileFormat    uff = getUltimaFileVersion(alignment);
         if ( renderOptions.isInsertQualColoring() & (uff != UltimaFileFormat.NON_FLOW) ) {
             // Ultima: large (>1) INSERT case
@@ -90,8 +95,10 @@ public class FlowIndelRendering {
             if ( p != 0 ) {
                 double q = -10 * Math.log10(p);
                 Color qColor = new Color(indelColorMap.getColor((int) q));
+                c = g.getColor();
                 g.setColor(qColor);
                 g.fillRect(pxLeft - pxWing, (int) (pxTop + (pxH - hairline) * (q / 42)), pxRight - pxLeft + hairline * pxWing, hairline);
+                g.setColor(c);
             }
         }
 
