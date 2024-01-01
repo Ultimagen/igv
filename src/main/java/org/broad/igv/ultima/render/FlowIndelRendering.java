@@ -31,7 +31,15 @@ public class FlowIndelRendering {
         final SAMAlignment samAlignment = (SAMAlignment)alignment;
 
         // must be a flow
-        return getUltimaFileVersion(alignment) != UltimaFileFormat.NON_FLOW;
+        return getUltimaFileVersion(alignment) == UltimaFileFormat.BASE_TP;
+    }
+
+    public boolean handlesBlock(AlignmentBlock block) {
+        return block.getLength() < 2;
+    }
+
+    public boolean handlesGap(Gap gap) {
+        return true; //return gap.getnBases() < 2;
     }
 
     public void renderSmallInsertion(Alignment alignment,
@@ -51,17 +59,14 @@ public class FlowIndelRendering {
         g.fillRect(x - pxWing, y, hairline + 2 * pxWing, hairline);
         g.fillRect(x - pxWing, y + h - hairline, hairline + 2 * pxWing, hairline);
 
-        UltimaFileFormat    uff = getUltimaFileVersion(alignment);
-        if ( renderOptions.isInsertQualColoring() && (uff != UltimaFileFormat.NON_FLOW) ) {
-            double p = qualsAsProb(aBlock.getQualities());
-            if ( p != 0 ) {
-                double q = -10 * Math.log10(p);
-                Color qColor = new Color(indelColorMap.getColor((int) q));
-                Color c = g.getColor();
-                g.setColor(qColor);
-                g.fillRect(x - pxWing, (int) (y + (h - hairline) * (q / 42)) - 1, hairline + 2 * pxWing, hairline * 2);
-                g.setColor(c);
-            }
+        double p = qualsAsProb(aBlock.getQualities());
+        if ( p != 0 ) {
+            double q = -10 * Math.log10(p);
+            Color qColor = new Color(indelColorMap.getColor((int) q));
+            Color c = g.getColor();
+            g.setColor(qColor);
+            g.fillRect(x - pxWing, (int) (y + (h - hairline) * (q / 42)) - 1, hairline + 2 * pxWing, hairline * 2);
+            g.setColor(c);
         }
     }
 
@@ -87,21 +92,18 @@ public class FlowIndelRendering {
         g.fillRect(pxLeft - pxWing, pxTop, pxRight - pxLeft + hairline * pxWing, hairline);
         g.fillRect(pxLeft - pxWing, pxTop + pxH - hairline, pxRight - pxLeft + hairline * pxWing, hairline);
         g.setColor(c);
-        UltimaFileFormat    uff = getUltimaFileVersion(alignment);
-        if ( renderOptions.isInsertQualColoring() & (uff != UltimaFileFormat.NON_FLOW) ) {
-            // Ultima: large (>1) INSERT case
-            // map qual into a sort of a linear scale and add indicator
-            double p = qualsAsProb(insertionBlock.getQualities());
-            if ( p != 0 ) {
-                double q = -10 * Math.log10(p);
-                Color qColor = new Color(indelColorMap.getColor((int) q));
-                c = g.getColor();
-                g.setColor(qColor);
-                g.fillRect(pxLeft - pxWing, (int) (pxTop + (pxH - hairline) * (q / 42)), pxRight - pxLeft + hairline * pxWing, hairline);
-                g.setColor(c);
-            }
-        }
 
+        // Ultima: large (>1) INSERT case
+        // map qual into a sort of a linear scale and add indicator
+        double p = qualsAsProb(insertionBlock.getQualities());
+        if ( p != 0 ) {
+            double q = -10 * Math.log10(p);
+            Color qColor = new Color(indelColorMap.getColor((int) q));
+            c = g.getColor();
+            g.setColor(qColor);
+            g.fillRect(pxLeft - pxWing, (int) (pxTop + (pxH - hairline) * (q / 42)), pxRight - pxLeft + hairline * pxWing, hairline);
+            g.setColor(c);
+        }
     }
 
     public void renderDeletionGap(Alignment alignment,
@@ -113,99 +115,82 @@ public class FlowIndelRendering {
         // collect quals (experimental)
         Color[]       markerColor = new Color[2];
         double[]      markerQ = new double[2];
-        boolean[]     markerFromT0 = new boolean[2];
-        UltimaFileFormat uff = getUltimaFileVersion(alignment);
-        if ( renderOptions.isInsertQualColoring() && (uff != UltimaFileFormat.NON_FLOW) ) {
+        AtomicBoolean markerFromT0_0 = new AtomicBoolean();
+        AtomicBoolean markerFromT0_1 = new AtomicBoolean();
 
-            // locate block who's end is the same as the start of the gap
-            boolean blockFound = false;
-            int blockIndex = 0;
-            final AlignmentBlock[] blocks = alignment.getAlignmentBlocks();
-            for ( ; blockIndex < blocks.length ; blockIndex++ ) {
-                if ( blocks[blockIndex].getEnd() == gap.getStart() ) {
-                    blockFound = true;
-                    break;
-                }
-                else if ( blocks[blockIndex].getEnd() > gap.getStart() )
-                    break;
+        // locate block who's end is the same as the start of the gap
+        boolean blockFound = false;
+        int blockIndex = 0;
+        final AlignmentBlock[] blocks = alignment.getAlignmentBlocks();
+        for ( ; blockIndex < blocks.length ; blockIndex++ ) {
+            if ( blocks[blockIndex].getEnd() == gap.getStart() ) {
+                blockFound = true;
+                break;
             }
-            if ( blockFound && (blockIndex < blocks.length - 1) ) {
-                AlignmentBlock abPrev = alignment.getAlignmentBlocks()[blockIndex];
-                AlignmentBlock abNext = alignment.getAlignmentBlocks()[blockIndex + 1];
-                if (abPrev.getQualities().length > 0 && abNext.getQualities().length > 0) {
+            else if ( blocks[blockIndex].getEnd() > gap.getStart() )
+                break;
+        }
 
-                    // calc based on reference
-                    Genome genome = GenomeManager.getInstance().getCurrentGenome();
-                    char        gapBase0 = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart()));
-                    char        gapBase1 = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart() + gap.getnBases() - 1));
-                    char        alignBase0 = Character.toUpperCase((char)abPrev.getBases().getByte(abPrev.getBases().length - 1));
-                    char        alignBase1 = Character.toUpperCase((char)abNext.getBases().getByte(0));
-                    char        gapBase0p = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart() - 1));
-                    char        gapBase1n = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart() + gap.getnBases()));
-                    boolean     snp0 = gapBase0p != alignBase0;
-                    boolean     snp1 = gapBase1n != alignBase1;
-                    byte[]      quals01 = new byte[1];
-                    if ( !snp0 ) {
-                        quals01[0] = abPrev.getQualities().getByte(abPrev.getQualities().length - 1);
-                        double  p;
-                        AtomicBoolean fromT0 = new AtomicBoolean();
-                        if ( uff == UltimaFileFormat.BASE_TP ) {
-                            int         delLength = 1;
-                            while ( (delLength + 1) <= gap.getnBases() &&
-                                    (gapBase0 == Character.toUpperCase(genome.getReference(alignment.getChr(), gap.getStart() + delLength))) )
-                                delLength++;
+        if ( blockFound && (blockIndex < blocks.length - 1) ) {
+            AlignmentBlock abPrev = alignment.getAlignmentBlocks()[blockIndex];
+            AlignmentBlock abNext = alignment.getAlignmentBlocks()[blockIndex + 1];
+            if (abPrev.getQualities().length > 0 && abNext.getQualities().length > 0) {
 
-                            p = qualsAsProbDeleteTP(((SAMAlignment) alignment), abPrev, delLength, false, gap, gapBase0p == gapBase0, fromT0);
-                        } else {
-                            p = qualsAsProb(new ByteSubarray(quals01, 0, quals01.length, (byte)0));
-                        }
-                        if ( p != 0 ) {
-                            markerQ[0] = -10 * Math.log10(p);
-                            markerColor[0] = new Color(indelColorMap.getColor((int) markerQ[0]));
-                            markerFromT0[0] = fromT0.get();
-                        }
+                // calc based on reference
+                Genome genome = GenomeManager.getInstance().getCurrentGenome();
+                char        gapBase0 = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart()));
+                char        gapBase1 = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart() + gap.getnBases() - 1));
+                char        alignBase0 = Character.toUpperCase((char)abPrev.getBases().getByte(abPrev.getBases().length - 1));
+                char        alignBase1 = Character.toUpperCase((char)abNext.getBases().getByte(0));
+                char        gapBase0p = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart() - 1));
+                char        gapBase1n = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart() + gap.getnBases()));
+                boolean     snp0 = gapBase0p != alignBase0;
+                boolean     snp1 = gapBase1n != alignBase1;
+
+                if ( !snp0 ) {
+                    int         delLength = 1;
+                    while ( (delLength + 1) <= gap.getnBases() &&
+                            (gapBase0 == Character.toUpperCase(genome.getReference(alignment.getChr(), gap.getStart() + delLength))) )
+                        delLength++;
+
+                    double p = qualsAsProbDeleteTP(((SAMAlignment) alignment), abPrev, delLength, false, gap, gapBase0p == gapBase0, markerFromT0_0);
+
+                    if ( p != 0 ) {
+                        markerQ[0] = -10 * Math.log10(p);
+                        markerColor[0] = new Color(indelColorMap.getColor((int) markerQ[0]));
                     }
-                    if ( !snp1 ) {
-                        quals01[0] = abNext.getQualities().getByte(0);
-                        double  p;
-                        AtomicBoolean fromT0 = new AtomicBoolean();
-                        if ( uff == UltimaFileFormat.BASE_TP ) {
-                            int         delLength = 1;
-                            while ( (delLength + 1) <= gap.getnBases() &&
-                                    (gapBase1 == Character.toUpperCase(genome.getReference(alignment.getChr(), gap.getStart() + gap.getnBases() - delLength))) )
-                                delLength++;
+                }
+                if ( !snp1 ) {
+                    int         delLength = 1;
+                    while ( (delLength + 1) <= gap.getnBases() &&
+                            (gapBase1 == Character.toUpperCase(genome.getReference(alignment.getChr(), gap.getStart() + gap.getnBases() - delLength))) )
+                        delLength++;
 
-                            p = qualsAsProbDeleteTP((SAMAlignment) alignment, abNext, delLength, true, gap, gapBase1n == gapBase1, fromT0);
-                        } else {
-                            p = qualsAsProb(new ByteSubarray(quals01, 0, quals01.length, (byte)0));
-                        }
-                        if ( p != 0 ) {
-                            markerQ[1] = -10 * Math.log10(p);
-                            markerColor[1] = new Color(indelColorMap.getColor((int) markerQ[1]));
-                            markerFromT0[1] = fromT0.get();
-                        }
+                    double p = qualsAsProbDeleteTP((SAMAlignment) alignment, abNext, delLength, true, gap, gapBase1n == gapBase1, markerFromT0_1);
+
+                    if ( p != 0 ) {
+                        markerQ[1] = -10 * Math.log10(p);
+                        markerColor[1] = new Color(indelColorMap.getColor((int) markerQ[1]));
                     }
                 }
             }
 
             // perform T0 priority
-            if ( markerFromT0[0] || markerFromT0[1] ) {
+            if ( markerFromT0_0.get() && markerFromT0_1.get() ) {
 
                 // if both, retain higher quality in slot 0 and erase slot 1.
                 // if just 1 then move to 0
-                if ( markerFromT0[1] ) {
-                    if ( !markerFromT0[0] || (markerQ[1] > markerQ[0]) ) {
-                        markerQ[0] = markerQ[1];    // copy slot 1 into slot 0
-                        markerColor[0] = markerColor[1];
-                    }
-                    markerColor[1] = null; // mark slot 1 as not used
+                if ( markerQ[1] > markerQ[0] ) {
+                    markerQ[0] = markerQ[1];    // copy slot 1 into slot 0
+                    markerColor[0] = markerColor[1];
                 }
-            }
-
-            // if no info then assume it is of high quality
-            if ( markerColor[0] == null && markerColor[1] == null ) {
-                markerQ[0] = NO_INFO_HIGH_QUALITY;
-                markerColor[0] = new Color(indelColorMap.getColor((int) markerQ[0]));
+                markerColor[1] = null; // mark slot 1 as not used
+            } else {
+                // T0 is considered only if on both sides. if not, cancel it out
+                if ( markerFromT0_0.get() )
+                    markerColor[0] = null;
+                if ( markerFromT0_1.get() )
+                    markerColor[1] = null;
             }
 
             // draw delete markers
@@ -245,7 +230,7 @@ public class FlowIndelRendering {
         }
     }
 
-    private enum UltimaFileFormat {
+   private enum UltimaFileFormat {
         NON_FLOW,
         BASE_TI,
         BASE_TP
@@ -460,7 +445,7 @@ public class FlowIndelRendering {
             start += (block.getLength() - 1);
         HMer        hmer = findHmer(record, start, 0, base);
 
-        // try establising by using t0
+        // try establishing by using t0
         final double t0qual = qualsAsProbDeleteTPByT0(samAlignment, record, block, delLength, delIsBeforeBlock, gap);
         if ( t0qual != 0 ) {
             fromT0.set(true);
@@ -473,32 +458,36 @@ public class FlowIndelRendering {
     private double qualsAsProbDeleteTPByT0(SAMAlignment samAlignment, SAMRecord record, AlignmentBlock block, int delLength, boolean delIsBeforeBlock, Gap gap) {
 
         // consider using t0 only if DEL of one base (additional conditions to follow)
-        if ( delLength != 1 ) {
+        if (delLength != 1) {
             return 0;
         }
 
-        // get location just before this read
-        final int         loc = block.getIndexOnRead() + (delIsBeforeBlock ? -1 : (block.getLength() - 1));
-        if ( loc < 0 )
-            return 0;
-
-        // get bases around the deletion. They must be different than the deleted base
-        final byte[]      bases = record.getReadBases();
-        if ( loc >= (bases.length - 1) )
-            return 0;
         Genome genome = GenomeManager.getInstance().getCurrentGenome();
         final byte delBase = (byte) Character.toUpperCase(genome.getReference(samAlignment.getChr(), gap.getStart()));
-        if ( (delBase == bases[loc]) ||  (delBase == bases[loc+1]) )
-            return 0;
 
-        // extract t0 values for the surrounding bases, convert to prob
-        if ( !record.hasAttribute(TAG_T0) )
-            return 0;
-        final byte[]      t0 = record.getStringAttribute(TAG_T0).getBytes();
-        final double      p0 = Math.pow(10.0, (t0[loc] - '!') / -10.0);
-        final double      p1 = Math.pow(10.0, (t0[loc+1] - '!') / -10.0);
+        // delete is before the block?
+        if (delIsBeforeBlock) {
 
-        // return maximal of the two
-        return Math.max(p0, p1);
+            if (delBase == record.getReadBases()[block.getIndexOnRead()])
+                return 0;
+
+            // extract t0 value
+            if (!record.hasAttribute(TAG_T0))
+                return 0;
+            final byte[] t0 = record.getStringAttribute(TAG_T0).getBytes();
+            return Math.pow(10.0, (t0[block.getIndexOnRead()] - '!') / -10.0);
+
+        } else {
+
+            // delete is after the block
+            if (delBase == record.getReadBases()[block.getIndexOnRead() + block.getLength() - 1])
+                return 0;
+
+            // extract t0 value
+            if (!record.hasAttribute(TAG_T0))
+                return 0;
+            final byte[] t0 = record.getStringAttribute(TAG_T0).getBytes();
+            return Math.pow(10.0, (t0[block.getIndexOnRead() + block.getLength() - 1] - '!') / -10.0);
+        }
     }
 }
