@@ -387,12 +387,17 @@ public class FlowIndelRendering {
         // get quals and tp
         byte[]      tp = record.getByteArrayAttribute(ATTR_TP);
 
-        // scan for tpValue, extract qual
+        // scan for tpValue, extract qual, average if more than one
+        // as tp encoded symmetrically, two locations are expected to be found
+        int foundCount = 0;
+        int foundQualSum = 0;
         for ( int ofs = hmer.start ; ofs <= hmer.end ; ofs++ )
             if ( tp[ofs] == tpValue ) {
-                byte[]      quals = record.getBaseQualities();
-                return Math.pow(10.0, -quals[ofs] / 10.0);
+                foundQualSum += record.getBaseQualities()[ofs];
+                foundCount++;
             }
+        if ( foundCount != 0 )
+            return Math.pow(10.0, -(foundQualSum / foundCount) / 10.0);
 
         // if here, none of the tp values matched
         // check for the special case of a delete which is of an original hmer larger than mc (def:12)
