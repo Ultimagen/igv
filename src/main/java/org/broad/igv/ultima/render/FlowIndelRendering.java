@@ -16,6 +16,7 @@ public class FlowIndelRendering {
     private static final double NO_INFO_HIGH_QUALITY = 40;
     private static ColorMap indelColorMap = ColorMap.getJet(42);
     private static final double MIN_PROB_DEFAULT = 0.01;
+    private static final double MAX_PROB_DEFAULT = 0.9999;
 
     private static String ATTR_TP = "tp";
     private static String ATTR_TI = "ti";
@@ -407,6 +408,12 @@ public class FlowIndelRendering {
             if ( tpValue + hmerSize > mc )
                 return 1.0 - MIN_PROB_DEFAULT;
         }
+
+        // if here and a deletion, return minimal probability as well.
+        // this is overlapping with the previous case, but as part of the visual development
+        // it is considered a separate case
+        if ( tpValue > 0)
+            return 1 - MAX_PROB_DEFAULT;
 
         // if here, simply fail
         return 0;
