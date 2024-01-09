@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class FlowIndelRendering {
 
     public static final String TAG_T0 = "t0";
-    private static final double NO_INFO_HIGH_QUALITY = 40;
+    private static final boolean GARRETY_LOW_PROB_MODE = true;
     private static ColorMap indelColorMap = ColorMap.getJet(42);
     private static final double MIN_PROB_DEFAULT = 0.01;
     private static final double MAX_PROB_DEFAULT = 0.9999;
@@ -388,26 +388,35 @@ public class FlowIndelRendering {
         // get quals and tp
         byte[]      tp = record.getByteArrayAttribute(ATTR_TP);
 
-        // scan for tpValue, extract qual, average if more than one
-        // as tp encoded symmetrically, two locations are expected to be found
-        int foundCount = 0;
-        int foundQualSum = 0;
-        for ( int ofs = hmer.start ; ofs <= hmer.end ; ofs++ )
+        // scan for tpValue, extract qual, choose min if more than one
+        int foundQual = Integer.MAX_VALUE;
+        boolean exactMatchFound = false;
+        for ( int ofs = hmer.start ; ofs <= hmer.end ; ofs++ ) {
+            boolean tpApplicable = false;
             if ( tp[ofs] == tpValue ) {
-                foundQualSum += record.getBaseQualities()[ofs];
-                foundCount++;
+                exactMatchFound = true;
+                tpApplicable = true;
             }
-        if ( foundCount != 0 )
-            return Math.pow(10.0, -(foundQualSum / foundCount) / 10.0);
+            if (GARRETY_LOW_PROB_MODE)
+                if ( tpValue > 0 && tp[ofs] < tpValue )
+                    tpApplicable = true;
+            if ( tpApplicable ) {
+                foundQual = Math.min(foundQual, record.getBaseQualities()[ofs]);
+            }
+        }
 
-        // if here, none of the tp values matched
+        // if here, none of the tp values matched exactly
         // check for the special case of a delete which is of an original hmer larger than mc (def:12)
-        if ( tpValue > 0 ) {
+        if ( !exactMatchFound && tpValue > 0 ) {
             int     mc = getMC(record);
             int     hmerSize = hmer.end - hmer.start + 1;
             if ( tpValue + hmerSize > mc )
                 return 1.0 - MIN_PROB_DEFAULT;
         }
+
+        // if we managed to get a qual value from other TP values, use them
+        if ( foundQual != Integer.MAX_VALUE )
+            return Math.pow(10.0, -foundQual / 10.0);
 
         // if here and a deletion, return minimal probability as well.
         // this is overlapping with the previous case, but as part of the visual development
