@@ -26,6 +26,8 @@ public class FlowIndelRendering {
     static class Hmer {
         int start;
         int end;
+        int backwardsSize = 0;
+        int forwardSize = 0;
 
         int size() { return end - start + 1; }
     }
@@ -77,13 +79,12 @@ public class FlowIndelRendering {
         g.fillRect(x - pxWing, y, hairline + 2 * pxWing, hairline);
         g.fillRect(x - pxWing, y + h - hairline, hairline + 2 * pxWing, hairline);
 
-
         // draw
         double q = getInsertionQuality(alignment, block);
         if ( !Double.isNaN(q) ) {
             Color currentColor = g.getColor();
             g.setColor(new Color(indelColorMap.getColor((int) q)));
-            g.fillRect(x - pxWing, (int) (y + (h - hairline) * (q / 42)) - 1, hairline + 2 * pxWing, hairline * 2);
+            g.fillRect(x - pxWing, (int) (y + (h - hairline) * ((42 - q) / 42)) - 1, hairline + 2 * pxWing, hairline * 2);
             g.setColor(currentColor);
         }
     }
@@ -116,7 +117,7 @@ public class FlowIndelRendering {
         if ( !Double.isNaN(q) ) {
             currentColor = g.getColor();
             g.setColor(new Color(indelColorMap.getColor((int) q)));
-            g.fillRect(pxLeft - pxWing, (int) (pxTop + (pxH - hairline) * (q / 42)), pxRight - pxLeft + hairline * pxWing, hairline);
+            g.fillRect(pxLeft - pxWing, (int) (pxTop + (pxH - hairline) * ((42 - q) / 42)), pxRight - pxLeft + hairline * pxWing, hairline);
             g.setColor(currentColor);
         }
     }
@@ -138,19 +139,52 @@ public class FlowIndelRendering {
         Genome genome = GenomeManager.getInstance().getCurrentGenome();
         char        nextBlcokFirstBase = Character.toUpperCase((char)abNext.getBases().getByte(0));
         char        gapLastBase = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart() + gap.getnBases() - 1));
-        boolean     isHmer = gapLastBase == nextBlcokFirstBase;
+        boolean     isForwardHmer = gapLastBase == nextBlcokFirstBase;
+        char        prevBlcokLastBase = Character.toUpperCase((char)abPrev.getBases().getByte(abPrev.getBasesLength() - 1));
+        char        gapFirstBase = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart()));
+        boolean     isBackwardsHmer = gapFirstBase == prevBlcokLastBase;
+
+        // we call something an hmer in this context only if it is hmer on exactly one side
+        boolean     isHmer = isBackwardsHmer ^ isForwardHmer;
 
         // figure out quality to plot - if any
         SAMRecord record = ((SAMAlignment)alignment).getRecord();
         double q = Double.NaN;
         if ( isHmer ) {
-            Hmer hmer = findHmer(record, abNext.getIndexOnRead(), (byte)gapLastBase, true, true);
+            Hmer hmer;
+            int delSize = 0;
+            if ( isForwardHmer ) {
+
+                // establish hmer on next block
+                hmer = findHmer(record, abNext.getIndexOnRead(), (byte) gapLastBase, false, true);
+
+                // establish hmer on gap
+                for ( delSize = 0 ; delSize < gap.getnBases() ; delSize++ ) {
+                    char base = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart() + delSize));
+                    if ( base != gapFirstBase ) {
+                        break;
+                    }
+                }
+            } else {
+
+                // establish hmer on prev block
+                hmer = findHmer(record, abPrev.getIndexOnRead() + abPrev.getBasesLength() - 1, (byte) gapFirstBase, true, false);
+
+
+                // establish hmer on gap
+                for ( delSize = 0 ; delSize < gap.getnBases() ; delSize++ ) {
+                    char base = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart() + gap.getnBases() - 1 - delSize));
+                    if ( base != gapLastBase ) {
+                        break;
+                    }
+                }
+            }
             if ( hmer.size() >= getMC(record) ) {
                 // HMER - length is at least max-hmer
                 q = MIN_POSSIBLE_QUALITY;
             } else {
                 // HMER - otherwise try TP
-                q = getQualityFromTP(record, hmer, gap.getnBases());
+                q = getQualityFromTP(record, hmer, delSize);
             }
         } else {
             if ( gap.getnBases() == 1 ) {
@@ -194,31 +228,34 @@ public class FlowIndelRendering {
         char        blockFirstBase = Character.toUpperCase((char)block.getBases().getByte(0));
         boolean     isBackwardsHmer = blockFirstBase == prevBlcokLastBase;
 
-        // if not an hmer - nothing to do here
-        if ( !isBackwardsHmer && !isForwardHmer )
+        // we call something an hmer in this context only if it is hmer on exactly one side
+        boolean     isHmer = isBackwardsHmer ^ isForwardHmer;
+
+        // if both side are non-hmer and size is 1 - special case
+        SAMRecord record = ((SAMAlignment)alignment).getRecord();
+        Double q = Double.NaN;
+        if ( !isBackwardsHmer && !isForwardHmer && block.getBasesLength() == 1 ) {
+
+            // treat insertion as an hmer on to itself
+            Hmer hmer = new Hmer();
+            hmer.start = hmer.end = block.getIndexOnRead();
+            q = getQualityFromTP(record, hmer, -hmer.size());
+            return q;
+        }
+
+        // if not an hmer, nothing to print
+        if ( !isHmer )
             return Double.NaN;
 
-        SAMRecord record = ((SAMAlignment)alignment).getRecord();
-        Double forwardQ = Double.NaN;
         if ( isForwardHmer ) {
             Hmer hmer = findHmer(record, abNext.getIndexOnRead(), (byte)nextBlcokFirstBase, true, true);
-            Hmer insertionHmer = findHmer(record, abNext.getIndexOnRead() - 1, (byte)nextBlcokFirstBase, true, false);
-            forwardQ = getQualityFromTP(record, hmer, -insertionHmer.size());
-        }
-        Double backwardsQ = Double.NaN;
-        if ( isBackwardsHmer ) {
+            q = getQualityFromTP(record, hmer, -hmer.backwardsSize);
+        } else if ( isBackwardsHmer ) {
             Hmer hmer = findHmer(record, abPrev.getIndexOnRead() + abPrev.getBasesLength() - 1 , (byte)prevBlcokLastBase, true, true);
-            Hmer insertionHmer = findHmer(record, abPrev.getIndexOnRead() + abPrev.getBasesLength(), (byte)prevBlcokLastBase, false, true);
-            backwardsQ = getQualityFromTP(record, hmer, -insertionHmer.size());
+            q = getQualityFromTP(record, hmer, -hmer.forwardSize);
         }
 
-        // integrate values
-        if ( Double.isNaN(forwardQ) )
-            return backwardsQ;
-        else if ( Double.isNaN(backwardsQ) )
-            return forwardQ;
-        else
-            return Math.max(backwardsQ, forwardQ);
+        return q;
     }
 
     private AlignmentBlock[] getBlockWrappingBlocks(Alignment alignment, AlignmentBlock block) {
@@ -300,12 +337,16 @@ public class FlowIndelRendering {
         hmer.end = hmer.start = start;
         byte[] bases = record.getReadBases();
         if ( walkBackwards ) {
-            while (hmer.start > 0 && bases[hmer.start - 1] == base)
+            while (hmer.start > 0 && bases[hmer.start - 1] == base) {
                 hmer.start--;
+                hmer.backwardsSize++;
+            }
         }
         if ( walkForward ) {
-            while ((hmer.end + 1) < bases.length && bases[hmer.end + 1] == base)
+            while ((hmer.end + 1) < bases.length && bases[hmer.end + 1] == base) {
                 hmer.end++;
+                hmer.forwardSize++;
+            }
         }
 
         return hmer;
