@@ -303,17 +303,22 @@ public class FlowIndelRendering {
         byte[]      tp = record.getByteArrayAttribute(ATTR_TP);
 
         // scan for tpValue
-        double qMax = Double.NaN;
         for ( int ofs = hmer.start ; ofs <= hmer.end ; ofs++ ) {
             final double q = record.getBaseQualities()[ofs];
             if ( tp[ofs] == tpValue ) {
                 return q;
             }
-            qMax = Double.isNaN(qMax) ? q : Math.max(qMax, q);
         }
 
-        // if here, not found
-        return qMax;
+        // if here, not found. return highest quality value found on read
+        final byte[] quals = record.getBaseQualities();
+        if ( quals.length == 0 )
+            return Double.NaN;
+        double q = Double.MIN_VALUE;
+        for ( byte qual : quals ) {
+            q = Math.max(qual, q);
+        }
+        return q;
     }
 
     private double getQualityFromT0(SAMRecord record, AlignmentBlock block, boolean delIsBeforeBlock) {
