@@ -147,48 +147,30 @@ public class FlowIndelRendering {
         // we call something an hmer in this context only if it is hmer on exactly one side
         boolean     isHmer = isBackwardsHmer ^ isForwardHmer;
 
+        // in addition, the hmer must span the whole gap
+        if ( isHmer ) {
+            isHmer = gapIsAllSameBase(genome, alignment, gap);
+        }
+
         // figure out quality to plot - if any
-        SAMRecord record = ((SAMAlignment)alignment).getRecord();
         double q = Double.NaN;
         if ( isHmer ) {
-            Hmer hmer;
-            int delSize = 0;
-            if ( isForwardHmer ) {
+            final SAMRecord record = ((SAMAlignment)alignment).getRecord();
+            Hmer hmer = isForwardHmer
+                    ? findHmer(record, abNext.getIndexOnRead(), (byte) gapLastBase, false, true)
+                    : findHmer(record, abPrev.getIndexOnRead() + abPrev.getBasesLength() - 1, (byte) gapFirstBase, true, false);
 
-                // establish hmer on next block
-                hmer = findHmer(record, abNext.getIndexOnRead(), (byte) gapLastBase, false, true);
-
-                // establish hmer on gap
-                for ( delSize = 0 ; delSize < gap.getnBases() ; delSize++ ) {
-                    char base = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart() + delSize));
-                    if ( base != gapFirstBase ) {
-                        break;
-                    }
-                }
-            } else {
-
-                // establish hmer on prev block
-                hmer = findHmer(record, abPrev.getIndexOnRead() + abPrev.getBasesLength() - 1, (byte) gapFirstBase, true, false);
-
-
-                // establish hmer on gap
-                for ( delSize = 0 ; delSize < gap.getnBases() ; delSize++ ) {
-                    char base = Character.toUpperCase((char)genome.getReference(alignment.getChr(), gap.getStart() + gap.getnBases() - 1 - delSize));
-                    if ( base != gapLastBase ) {
-                        break;
-                    }
-                }
-            }
             if ( hmer.size() >= getMC(record) ) {
                 // HMER - length is at least max-hmer
                 q = MIN_POSSIBLE_QUALITY;
             } else {
                 // HMER - otherwise try TP
-                q = getQualityFromTP(record, hmer, delSize);
+                q = getQualityFromTP(record, hmer, gap.getnBases());
             }
         } else {
             if ( gap.getnBases() == 1 ) {
                 // NON-HMER, single base, try T0
+                final SAMRecord record = ((SAMAlignment)alignment).getRecord();
                 double qBefore = getQualityFromT0(record, abPrev, false);
                 double qAfter = getQualityFromT0(record, abNext, true);
                 if ( Double.isNaN(qBefore) )
@@ -230,6 +212,11 @@ public class FlowIndelRendering {
 
         // we call something an hmer in this context only if it is hmer on exactly one side
         boolean     isHmer = isBackwardsHmer ^ isForwardHmer;
+
+        // in addition, the hmer must span the whole gap
+        if ( isHmer ) {
+            isHmer = blockIsAllSameBase(block);
+        }
 
         // if both side are non-hmer and size is 1 - special case
         SAMRecord record = ((SAMAlignment)alignment).getRecord();
@@ -355,6 +342,26 @@ public class FlowIndelRendering {
         }
 
         return hmer;
+    }
+
+    private boolean gapIsAllSameBase(Genome genome, Alignment alignment, Gap gap) {
+        final byte base = genome.getReference(alignment.getChr(), gap.getStart());
+        for ( int i = 1 ; i < gap.getnBases() ; i++ ) {
+            if ( genome.getReference(alignment.getChr(), gap.getStart() + i) != base ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean blockIsAllSameBase(AlignmentBlock block) {
+        final byte base = block.getBases().getByte(0);
+        for ( int i = 1 ; i < block.getBasesLength() ; i++ ) {
+            if ( block.getBases().getByte(i) != base ) {
+                return false;
+            }
+        }
+        return true;
     }
 
 
