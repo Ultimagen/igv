@@ -39,16 +39,19 @@ public class FlowIndelRendering {
         // we only handle sam alignments
         if ( !(alignment instanceof SAMAlignment) )
             return false;
-        final SAMAlignment samAlignment = (SAMAlignment)alignment;
 
-        // must be a modern Ultima flow
-        final SAMReadGroupRecord readGroup = samAlignment.getRecord().getReadGroup();
+        return isFlow(((SAMAlignment)alignment).getRecord());
+    }
+
+    public static boolean isFlow(SAMRecord record) {
+
+        final SAMReadGroupRecord readGroup = record.getReadGroup();
         if ( readGroup == null )
             return false;
         if ( !RG_ATTR_PL_ULTIMA.equals(readGroup.getAttribute(RG_ATTR_PL))
-             &&  (readGroup.getAttribute(RG_ATTR_MC) == null) )
+                &&  (readGroup.getAttribute(RG_ATTR_MC) == null) )
             return false;
-        if ( !samAlignment.getRecord().hasAttribute(ATTR_TP)  )
+        if ( !record.hasAttribute(ATTR_TP)  )
             return false;
 
         return true;

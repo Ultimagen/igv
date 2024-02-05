@@ -5,6 +5,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.broad.igv.sam.AlignmentBlock;
 import org.broad.igv.sam.ByteSubarray;
 import org.broad.igv.sam.SAMAlignment;
+import org.broad.igv.ultima.render.FlowIndelRendering;
 
 public class FlowBlockAnnotator {
 
@@ -23,7 +24,7 @@ public class FlowBlockAnnotator {
 
     public void appendBlockQualityAnnotation(SAMAlignment samAlignment, AlignmentBlock block, StringBuffer buf) {
 
-        if ( isFlow(samAlignment.getRecord()) ) {
+        if (FlowIndelRendering.isFlow(samAlignment.getRecord()) ) {
             buf.append(" @ QV " + qualsAsString(block.getQualities()) + attrAsString(samAlignment, block, KEY_ATTR, -1));
             buf.append(" " + attrAsString(samAlignment, block, T0_ATTR, -1));
         }
@@ -31,21 +32,10 @@ public class FlowBlockAnnotator {
 
     public void appendBlockAttrAnnotation(SAMAlignment samAlignment, AlignmentBlock block, int offset, StringBuffer buf) {
 
-        if ( isFlow(samAlignment.getRecord()) ) {
+        if ( FlowIndelRendering.isFlow(samAlignment.getRecord()) ) {
             buf.append(attrAsString(samAlignment, block, KEY_ATTR, offset));
             buf.append(attrAsString(samAlignment, block, T0_ATTR, offset));
         }
-    }
-
-    private boolean isFlow(SAMRecord record) {
-
-        // must have one of the key attributes
-        for ( String name : KEY_ATTR.split(",") ) {
-            if ( record.hasAttribute(name) ) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private int[] attrAsIntegers(SAMAlignment samAlignment, AlignmentBlock block, String name, int offset, StringBuilder sbName) {
@@ -127,7 +117,6 @@ public class FlowBlockAnnotator {
             }
             if ( isDigest && (i == digestLength) )
                 sb.append("...");
-            i++;
         }
 
         return sb.toString();
