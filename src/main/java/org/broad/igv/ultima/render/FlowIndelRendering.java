@@ -43,6 +43,8 @@ public class FlowIndelRendering {
 
         // must be a modern Ultima flow
         final SAMReadGroupRecord readGroup = samAlignment.getRecord().getReadGroup();
+        if ( readGroup == null )
+            return false;
         if ( !RG_ATTR_PL_ULTIMA.equals(readGroup.getAttribute(RG_ATTR_PL))
              &&  (readGroup.getAttribute(RG_ATTR_MC) == null) )
             return false;
@@ -317,6 +319,8 @@ public class FlowIndelRendering {
 
     private int getMC(SAMRecord record) {
         try {
+            if ( record.getReadGroup() == null )
+                return 0;
             return Integer.parseInt(record.getReadGroup().getAttribute("mc"));
         } catch (Exception e) {
             return 0;
