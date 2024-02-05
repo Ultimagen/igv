@@ -18,9 +18,10 @@ public class FlowIndelRendering {
     private static final String RG_ATTR_MC = "mc";
     private static final String RG_ATTR_PL_ULTIMA = "ULTIMA";
     private static final double MIN_POSSIBLE_QUALITY = 0;
+    public static final int COLORMAP_SIZE = 44;
 
     // the color map
-    private static ColorMap indelColorMap = ColorMap.getJet(42);
+    private static ColorMap indelColorMap = ColorMap.getJet(COLORMAP_SIZE);
 
     // an Hmer
     static class Hmer {
@@ -295,10 +296,15 @@ public class FlowIndelRendering {
         byte[]      tp = record.getByteArrayAttribute(ATTR_TP);
 
         // scan for tpValue
-        for ( int ofs = hmer.start ; ofs <= hmer.end ; ofs++ ) {
-            final double q = record.getBaseQualities()[ofs];
             if ( tp[ofs] == tpValue ) {
-                return q;
+                // all non-central entries must be doubled due to the symmetric nature of the quality string
+                final double q = record.getBaseQualities()[ofs];
+                final boolean isCenteralBaseInHmer = (ofs - hmer.start) == (hmer.end - ofs);
+                if ( isCenteralBaseInHmer) {
+                    return q;
+                } else {
+                    return -10.0 * Math.log10(Math.pow(10, q / -10.0) * 2);
+                }
             }
         }
 
