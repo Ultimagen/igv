@@ -76,7 +76,7 @@ public class FlowIndelRendering {
 
         int pxWing = (h > 10 ? 2 : (h > 5) ? 1 : 0);
         int hairline = 2;
-        if ( renderOptions.isInsertQualColoring() ) {
+        if ( renderOptions.isIndelQualColoring() ) {
             pxWing = Math.min(pxWing, Math.max(1, (int) (1 / context.getScale())));
             hairline = Math.min(hairline, pxWing);
         }
@@ -86,8 +86,8 @@ public class FlowIndelRendering {
         g.fillRect(x - pxWing, y + h - hairline, hairline + 2 * pxWing, hairline);
 
         // draw
-        double q = getInsertionQuality(alignment, block);
-        if ( !Double.isNaN(q) ) {
+        double q = getInsertionQuality(alignment, block, renderOptions);
+        if ( !Double.isNaN(q) && renderOptions.isIndelQualColoring() ) {
             Color currentColor = g.getColor();
             g.setColor(new Color(indelColorMap.getColor((int) q)));
             g.fillRect(x - pxWing, (int) (y + (h - hairline) * ((42 - q) / 42)) - 1, hairline + 2 * pxWing, hairline * 2);
@@ -107,7 +107,7 @@ public class FlowIndelRendering {
         // adjust wing and hairline
         int hairline = 2;
         double locScale = context.getScale();
-        if ( renderOptions.isInsertQualColoring() ) {
+        if ( renderOptions.isIndelQualColoring() ) {
             pxWing = Math.min(pxWing, Math.max(1, (int) (1 / locScale)));
             hairline = Math.min(hairline, pxWing);
         }
@@ -119,8 +119,8 @@ public class FlowIndelRendering {
         g.setColor(currentColor);
 
         // draw
-        double q = getInsertionQuality(alignment, block);
-        if ( !Double.isNaN(q) ) {
+        double q = getInsertionQuality(alignment, block, renderOptions);
+        if ( !Double.isNaN(q) && renderOptions.isIndelQualColoring() ) {
             currentColor = g.getColor();
             g.setColor(new Color(indelColorMap.getColor((int) q)));
             g.fillRect(pxLeft - pxWing, (int) (pxTop + (pxH - hairline) * ((42 - q) / 42)), pxRight - pxLeft + hairline * pxWing, hairline);
@@ -133,6 +133,9 @@ public class FlowIndelRendering {
                                           int y, int h, int x, int w,
                                           RenderContext context,
                                           AlignmentTrack.RenderOptions renderOptions) {
+
+        if ( !renderOptions.isIndelQualColoring() )
+            return;
 
         // establish alignment blocks wrapping this gap (before and after)
         AlignmentBlock[] blocks = getGapWrappingBlocks(alignment, gap);
@@ -171,7 +174,7 @@ public class FlowIndelRendering {
                 q = MIN_POSSIBLE_QUALITY;
             } else {
                 // HMER - otherwise try TP
-                q = getQualityFromTP(record, hmer, gap.getnBases());
+                q = getQualityFromTP(record, hmer, gap.getnBases(), renderOptions);
             }
         } else {
             if ( gap.getnBases() == 1 ) {
@@ -199,7 +202,7 @@ public class FlowIndelRendering {
         g.setColor(currentColor);
     }
 
-    private double getInsertionQuality(Alignment alignment, AlignmentBlock block) {
+    private double getInsertionQuality(Alignment alignment, AlignmentBlock block, AlignmentTrack.RenderOptions renderOptions) {
 
         // establish alignment blocks wrapping this insertion block (before and after)
         AlignmentBlock[] blocks = getBlockWrappingBlocks(alignment, block);
@@ -232,7 +235,7 @@ public class FlowIndelRendering {
             // treat insertion as an hmer on to itself
             Hmer hmer = new Hmer();
             hmer.start = hmer.end = block.getIndexOnRead();
-            q = getQualityFromTP(record, hmer, -hmer.size());
+            q = getQualityFromTP(record, hmer, -hmer.size(), renderOptions);
             return q;
         }
 
@@ -242,10 +245,10 @@ public class FlowIndelRendering {
 
         if ( isForwardHmer ) {
             Hmer hmer = findHmer(record, abNext.getIndexOnRead(), (byte)nextBlcokFirstBase, true, true);
-            q = getQualityFromTP(record, hmer, -hmer.backwardsSize);
+            q = getQualityFromTP(record, hmer, -hmer.backwardsSize, renderOptions);
         } else if ( isBackwardsHmer ) {
             Hmer hmer = findHmer(record, abPrev.getIndexOnRead() + abPrev.getBasesLength() - 1 , (byte)prevBlcokLastBase, true, true);
-            q = getQualityFromTP(record, hmer, -hmer.forwardSize);
+            q = getQualityFromTP(record, hmer, -hmer.forwardSize, renderOptions);
         }
 
         return q;
@@ -290,33 +293,42 @@ public class FlowIndelRendering {
         }
     }
 
-    private double getQualityFromTP(SAMRecord record, Hmer hmer, int tpValue) {
+    private double getQualityFromTP(SAMRecord record, Hmer hmer, int tpValue, AlignmentTrack.RenderOptions renderOptions) {
 
         // get quals and tp
         byte[]      tp = record.getByteArrayAttribute(ATTR_TP);
 
         // scan for tpValue
-            if ( tp[ofs] == tpValue ) {
-                // all non-central entries must be doubled due to the symmetric nature of the quality string
-                final double q = record.getBaseQualities()[ofs];
-                final boolean isCenteralBaseInHmer = (ofs - hmer.start) == (hmer.end - ofs);
-                if ( isCenteralBaseInHmer) {
-                    return q;
-                } else {
-                    return -10.0 * Math.log10(Math.pow(10, q / -10.0) * 2);
+        if ( !renderOptions.isIndelQualUsesMin() ) {
+            for (int ofs = hmer.start; ofs <= hmer.end; ofs++) {
+                if (tp[ofs] == tpValue) {
+                    // all non-central entries must be doubled due to the symmetric nature of the quality string
+                    final double q = record.getBaseQualities()[ofs];
+                    final boolean isCenteralBaseInHmer = (ofs - hmer.start) == (hmer.end - ofs);
+                    if (isCenteralBaseInHmer) {
+                        return q;
+                    } else {
+                        return -10.0 * Math.log10(Math.pow(10, q / -10.0) * 2);
+                    }
                 }
             }
-        }
 
-        // if here, not found. return highest quality value found on read
-        final byte[] quals = record.getBaseQualities();
-        if ( quals.length == 0 )
-            return Double.NaN;
-        double q = Double.MIN_VALUE;
-        for ( byte qual : quals ) {
-            q = Math.max(qual, q);
+            // if here, not found. return highest quality value found on read
+            final byte[] quals = record.getBaseQualities();
+            if (quals.length == 0)
+                return Double.NaN;
+            double q = Double.MIN_VALUE;
+            for (byte qual : quals) {
+                q = Math.max(qual, q);
+            }
+            return q;
+        } else {
+            double q = Double.MAX_VALUE;
+            for (int ofs = hmer.start; ofs <= hmer.end; ofs++) {
+                q = Math.min(q, record.getBaseQualities()[ofs]);
+            }
+            return q;
         }
-        return q;
     }
 
     private double getQualityFromT0(SAMRecord record, AlignmentBlock block, boolean delIsBeforeBlock) {
